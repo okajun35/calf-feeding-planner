@@ -9,6 +9,7 @@
 **目的**: 空のファイルとディレクトリを揃え、実装の土台を作る。
 
 - [ ] `src/` ディレクトリを作成する
+- [ ] `tests/` ディレクトリを作成する
 - [ ] `index.html` を作成する（`<script type="module" src="src/main.js">` を含む最小HTML）
 - [ ] `src/style.css` を作成する（空ファイル）
 - [ ] `src/state.js` を作成する（空ファイル）
@@ -16,8 +17,12 @@
 - [ ] `src/calculator.js` を作成する（空ファイル）
 - [ ] `src/renderer.js` を作成する（空ファイル）
 - [ ] `src/main.js` を作成する（空ファイル）
+- [ ] `package.json` を作成する（`vitest`, `fast-check`, `eslint`, `stylelint` を devDependencies に含む）
+- [ ] `npm install` を実行して依存パッケージをインストールする
+- [ ] `eslint.config.js` を作成する（linting.md の設定に従う）
+- [ ] `.stylelintrc.json` を作成する（linting.md の設定に従う）
 
-**完了条件**: ブラウザで `index.html` を開いてコンソールエラーが出ないこと。
+**完了条件**: ブラウザで `index.html` を開いてコンソールエラーが出ないこと。`npm test` を実行してテストランナーが起動すること（テストファイルがないため 0 件で終了）。
 
 ---
 
@@ -49,22 +54,27 @@
 
 **目的**: 全入力値の検証ロジックを純粋関数として実装する。対応要件: REQ-201〜205
 
-- [ ] `validate(state)` を実装し、`ValidationResult` オブジェクトを返す
-- [ ] `nursingDays` の検証を実装する（空・非整数・1〜180範囲外）
-- [ ] `concentration` の検証を実装する（空・非数値・1〜30範囲外）
-- [ ] `unitPrice` の検証を実装する（空・非数値・0以下）
-- [ ] 各ステージの `startDay` 検証を実装する（空・非整数・1未満）
-- [ ] 各ステージの `endDay` 検証を実装する（空・非整数・startDay未満・nursingDays超過）
-- [ ] 各ステージの `dailyAmount` 検証を実装する（空・非数値・0以下）
-- [ ] カバレッジチェックを実装する
-  - ステージを `startDay` 昇順でソート
-  - day 1 から始まっているか確認（ギャップ検出）
-  - 前ステージの `endDay + 1 === 次ステージの startDay` を確認（ギャップ・重複の検出）
-  - 最終ステージの `endDay === nursingDays` を確認
-- [ ] Design セクション7のエラーメッセージ文言をすべて実装する
-- [ ] `valid` フラグを「全フィールドのエラーが null」の場合のみ `true` にする
+**手順（TDD: Red → Green → Refactor）**
 
-**完了条件**: 各種不正値と正常値を引数に与えたとき、期待する `ValidationResult` が返ること。
+- [ ] **[Red]** `tests/validation.test.js` を作成し、以下のテストを書く（すべて失敗することを確認）
+  - 通常テスト: `nursingDays` の境界値（0, 1, 180, 181）、空文字列、小数
+  - 通常テスト: `concentration` の境界値（0, 1, 30, 31）、空文字列
+  - 通常テスト: `unitPrice` の境界値（0, 1）、空文字列
+  - 通常テスト: ステージ各フィールドの正常値・異常値
+  - 通常テスト: カバレッジエラー（ギャップ・重複）のケース
+  - **PBT**: 有効な state を渡すと `valid: true` になること（`fc.record` で任意の有効値を生成）
+  - **PBT**: `nursingDays` が範囲外なら常に `valid: false` になること
+- [ ] **[Green]** `validate(state)` を実装し、全テストを通す
+  - `nursingDays`: 整数かつ 1〜180 の範囲チェック
+  - `concentration`: 数値かつ 1〜30 の範囲チェック
+  - `unitPrice`: 数値かつ > 0 チェック
+  - 各ステージ: `startDay`（整数 ≥ 1）、`endDay`（整数 ≥ startDay かつ ≤ nursingDays）、`dailyAmount`（数値 > 0）
+  - カバレッジチェック: `startDay` 昇順ソート → day 1 から連続して `nursingDays` まで埋まっているか確認
+  - Design セクション7のエラーメッセージ文言をすべて実装する
+  - `valid` フラグを「全フィールドのエラーが null」の場合のみ `true` にする
+- [ ] **[Refactor]** 重複ロジックを内部ヘルパー関数に抽出する（`export` しない）。`npm test` が Green のままであることを確認する
+
+**完了条件**: `npm test` で `validation.test.js` の全テスト（通常テスト + PBT）が Green になること。
 
 ---
 
@@ -72,19 +82,47 @@
 
 **目的**: 代用乳使用量とコストの計算を純粋関数として実装する。対応要件: REQ-301〜305
 
-- [ ] `calculate(state)` を実装し、`CalculationResult` オブジェクトを返す
-- [ ] 各ステージの `daysInStage = endDay - startDay + 1` を計算する
-- [ ] 各ステージの `subtotalPowderKg = (dailyAmount * daysInStage) / 1000` を計算する
-- [ ] `totalPowderKg` をステージ小計の合算で計算する
-- [ ] `costPerHead = totalPowderKg * unitPrice` を計算する
-- [ ] `stageBreakdown` 配列（`stageNo`, `startDay`, `endDay`, `daysInStage`, `dailyAmount`, `subtotalPowderKg` を含む）を組み立てる
+**手順（TDD: Red → Green → Refactor）**
 
-**完了条件**: デフォルト状態を渡したとき `totalPowderKg = 31.00`、`costPerHead = 18600` が返ること。
-（7.00 + 16.80 + 7.20 = 31.00 kg、31.00 × 600 = 18,600 円）
+- [ ] **[Red]** `tests/calculator.test.js` を作成し、以下のテストを書く（すべて失敗することを確認）
+  - 通常テスト: デフォルト3ステージで `totalPowderKg = 31.00`、`costPerHead = 18600`
+  - 通常テスト: 1ステージ（1〜60日, 500g/日）で `totalPowderKg = 30.00`
+  - 通常テスト: `stageBreakdown` の各フィールド（`daysInStage`, `subtotalPowderKg`）が正しいこと
+  - **PBT**: 任意の有効な入力で `totalPowderKg > 0` になること
+  - **PBT**: `costPerHead === totalPowderKg × unitPrice` が常に成立すること
+  - **PBT**: `stageBreakdown` の `subtotalPowderKg` 合算が `totalPowderKg` に等しいこと
+- [ ] **[Green]** `calculate(state)` を実装し、全テストを通す
+  - 各ステージの `daysInStage = endDay - startDay + 1` を計算する
+  - 各ステージの `subtotalPowderKg = (dailyAmount * daysInStage) / 1000` を計算する
+  - `totalPowderKg` をステージ小計の合算で計算する
+  - `costPerHead = totalPowderKg * unitPrice` を計算する
+  - `stageBreakdown` 配列（`stageNo`, `startDay`, `endDay`, `daysInStage`, `dailyAmount`, `subtotalPowderKg` を含む）を組み立てる
+- [ ] **[Refactor]** コードを整理する。`npm test` が Green のままであることを確認する
+
+**完了条件**: `npm test` で `calculator.test.js` の全テスト（通常テスト + PBT）が Green になること。カバレッジ 100%。
 
 ---
 
-### Task 5: HTMLマークアップ（`index.html`）の実装
+### Task 4.5: 状態管理モジュール（`src/state.js`）のテスト追加
+
+**目的**: `state.js` の操作関数をTDDで検証する。
+
+**手順（TDD: Red → Green → Refactor）**
+
+- [ ] **[Red]** `tests/state.test.js` を作成し、以下のテストを書く
+  - 通常テスト: `getState()` がデフォルト値を返すこと
+  - 通常テスト: `addStage()` でステージが1件増えること
+  - 通常テスト: `removeStage(id)` でステージが1件減ること
+  - 通常テスト: `stages.length === 1` のとき `removeStage()` が何もしないこと
+  - 通常テスト: `updateStage(id, 'dailyAmount', 700)` で値が更新されること
+  - **PBT**: `addStage()` を n 回呼ぶと `stages.length` が n 増えること
+  - **PBT**: `removeStage()` はステージが1件以上あるときのみ件数を減らすこと
+- [ ] **[Green]** `state.js` を実装し、全テストを通す（Task 2 の実装と同時進行でよい）
+- [ ] **[Refactor]** `npm test` が Green のままであることを確認する
+
+**完了条件**: `npm test` で `state.test.js` の全テストが Green になること。カバレッジ 80% 以上。
+
+---
 
 **目的**: アプリの構造を定義し、JavaScriptから参照できる id/class を配置する。対応要件: REQ-401〜403, REQ-501〜503, REQ-605
 

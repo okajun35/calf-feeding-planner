@@ -131,6 +131,115 @@ export function calculate() {
 
 ---
 
+## プロパティベーステスト（PBT）
+
+具体的な入力値を使う通常のテストに加え、**[fast-check](https://github.com/dubzzz/fast-check)** を使ったPBTを `calculator.js` と `validation.js` に適用します。
+PBTは「任意の有効な入力に対して常に成り立つ性質」を検証するため、手動では思いつかないエッジケースを自動探索できます。
+
+### インストール
+
+```bash
+npm install --save-dev fast-check
+```
+
+### 適用対象と検証すべき性質
+
+#### `calculate()` — 3つの性質
+
+```js
+import fc from 'fast-check';
+import { calculate } from '../src/calculator.js';
+
+// Arbitrary: 有効な単一ステージ状態を生成
+const validSingleStageState = fc.record({
+  unitPrice: fc.integer({ min: 1, max: 100000 }),
+  stages: fc.tuple(
+    fc.record({
+      id: fc.constant(1),
+      startDay: fc.constant(1),
+      endDay: fc.integer({ min: 1, max: 180 }),
+      dailyAmount: fc.integer({ min: 1, max: 10000 }),
+    })
+  ).map(([stage]) => [stage]),
+});
+
+// 性質1: totalPowderKg は常に正
+it('任意の有効な入力で totalPowderKg が正の値になること', () => {
+  fc.assert(fc.property(validSingleStageState, (state) => {
+    return calculate(state).totalPowderKg > 0;
+  }));
+});
+
+// 性質2: costPerHead === totalPowderKg × unitPrice（乗算の整合性）
+it('costPerHead が totalPowderKg × unitPrice に等しいこと', () => {
+  fc.assert(fc.property(validSingleStageState, (state) => {
+    const result = calculate(state);
+    return Math.abs(result.costPerHead - result.totalPowderKg * state.unitPrice) < 1e-9;
+  }));
+});
+
+// 性質3: stageBreakdown の小計合算 === totalPowderKg
+it('stageBreakdown の subtotalPowderKg 合算が totalPowderKg に等しいこと', () => {
+  fc.assert(fc.property(validSingleStageState, (state) => {
+    const result = calculate(state);
+    const sum = result.stageBreakdown.reduce((acc, s) => acc + s.subtotalPowderKg, 0);
+    return Math.abs(sum - result.totalPowderKg) < 1e-9;
+  }));
+});
+```
+
+#### `validate()` — 2つの性質
+
+```js
+import fc from 'fast-check';
+import { validate } from '../src/validation.js';
+
+// 性質4: 有効な入力は常に valid: true
+it('有効な状態を渡すと valid が true になること', () => {
+  const validState = fc.record({
+    nursingDays: fc.integer({ min: 1, max: 180 }),
+    concentration: fc.float({ min: 1, max: 30 }),
+    unitPrice: fc.integer({ min: 1, max: 100000 }),
+    stages: fc.constant([
+      { id: 1, startDay: 1, endDay: 30, dailyAmount: 500 },
+    ]),
+    nextStageId: fc.constant(2),
+  });
+  fc.assert(fc.property(validState, (state) => {
+    return validate(state).valid === true;
+  }));
+});
+
+// 性質5: nursingDays が範囲外なら常に valid: false
+it('nursingDays が 1〜180 の範囲外なら valid が false になること', () => {
+  const invalidNursingDays = fc.oneof(
+    fc.integer({ max: 0 }),
+    fc.integer({ min: 181 }),
+  );
+  fc.assert(fc.property(invalidNursingDays, (nursingDays) => {
+    const state = {
+      nursingDays,
+      concentration: 12.5,
+      unitPrice: 600,
+      stages: [{ id: 1, startDay: 1, endDay: 60, dailyAmount: 500 }],
+      nextStageId: 2,
+    };
+    return validate(state).valid === false;
+  }));
+});
+```
+
+### PBTと通常テストの使い分け
+
+| テスト種別 | 使う場面 |
+|-----------|---------|
+| 通常テスト（具体値） | 境界値・エラーメッセージの文言・デフォルト値の検証 |
+| PBT（性質ベース） | 計算の整合性・バリデーションの網羅性・不変条件の検証 |
+
+両者は補完関係にあり、どちらか一方で代替するのではなく**併用**する。
+
+---
+
 ## カバレッジ目標
 
 | モジュール | 目標カバレッジ |

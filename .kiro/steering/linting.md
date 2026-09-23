@@ -127,7 +127,8 @@ npm install --save-dev stylelint stylelint-config-standard
     "@eslint/js": "^9.0.0",
     "stylelint": "^16.0.0",
     "stylelint-config-standard": "^36.0.0",
-    "vitest": "^2.0.0"
+    "vitest": "^2.0.0",
+    "fast-check": "^3.0.0"
   }
 }
 ```
