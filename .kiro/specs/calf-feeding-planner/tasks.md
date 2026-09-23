@@ -57,13 +57,14 @@
 **手順（TDD: Red → Green → Refactor）**
 
 - [ ] **[Red]** `tests/validation.test.js` を作成し、以下のテストを書く（すべて失敗することを確認）
-  - 通常テスト: `nursingDays` の境界値（0, 1, 180, 181）、空文字列、小数
-  - 通常テスト: `concentration` の境界値（0, 1, 30, 31）、空文字列
-  - 通常テスト: `unitPrice` の境界値（0, 1）、空文字列
-  - 通常テスト: ステージ各フィールドの正常値・異常値
-  - 通常テスト: カバレッジエラー（ギャップ・重複）のケース
-  - **PBT**: 有効な state を渡すと `valid: true` になること（`fc.record` で任意の有効値を生成）
-  - **PBT**: `nursingDays` が範囲外なら常に `valid: false` になること
+  - 具体値テスト: `nursingDays` の境界値（0, 1, 180, 181）、空文字列、小数
+  - 具体値テスト: `concentration` の境界値（0, 1, 30, 31）、空文字列
+  - 具体値テスト: `unitPrice` の境界値（0, 1）、空文字列
+  - 具体値テスト: ステージ各フィールドの正常値・異常値
+  - 具体値テスト: カバレッジエラー（ギャップ・重複）のケース
+  - PBT: PROP-04（有効入力 → `valid: true`）— `correctness.md` 参照
+  - PBT: PROP-05（`nursingDays` 範囲外 → `valid: false`）— `correctness.md` 参照
+  - PBT: PROP-06（連続カバレッジ → `errors.coverage === null`）— `correctness.md` 参照
 - [ ] **[Green]** `validate(state)` を実装し、全テストを通す
   - `nursingDays`: 整数かつ 1〜180 の範囲チェック
   - `concentration`: 数値かつ 1〜30 の範囲チェック
@@ -74,7 +75,7 @@
   - `valid` フラグを「全フィールドのエラーが null」の場合のみ `true` にする
 - [ ] **[Refactor]** 重複ロジックを内部ヘルパー関数に抽出する（`export` しない）。`npm test` が Green のままであることを確認する
 
-**完了条件**: `npm test` で `validation.test.js` の全テスト（通常テスト + PBT）が Green になること。
+**完了条件**: `npm test` で `validation.test.js` の全テスト（具体値テスト + PBT）が Green になること。
 
 ---
 
@@ -85,12 +86,12 @@
 **手順（TDD: Red → Green → Refactor）**
 
 - [ ] **[Red]** `tests/calculator.test.js` を作成し、以下のテストを書く（すべて失敗することを確認）
-  - 通常テスト: デフォルト3ステージで `totalPowderKg = 31.00`、`costPerHead = 18600`
-  - 通常テスト: 1ステージ（1〜60日, 500g/日）で `totalPowderKg = 30.00`
-  - 通常テスト: `stageBreakdown` の各フィールド（`daysInStage`, `subtotalPowderKg`）が正しいこと
-  - **PBT**: 任意の有効な入力で `totalPowderKg > 0` になること
-  - **PBT**: `costPerHead === totalPowderKg × unitPrice` が常に成立すること
-  - **PBT**: `stageBreakdown` の `subtotalPowderKg` 合算が `totalPowderKg` に等しいこと
+  - 具体値テスト: デフォルト3ステージで `totalPowderKg = 31.00`、`costPerHead = 18600`
+  - 具体値テスト: 1ステージ（1〜60日, 500g/日）で `totalPowderKg = 30.00`
+  - 具体値テスト: `stageBreakdown` の各フィールド（`daysInStage`, `subtotalPowderKg`）が正しいこと
+  - PBT: PROP-01（任意の有効入力で `totalPowderKg > 0`）— `correctness.md` 参照
+  - PBT: PROP-02（`costPerHead === totalPowderKg × unitPrice`）— `correctness.md` 参照
+  - PBT: PROP-03（`Σ subtotalPowderKg === totalPowderKg`）— `correctness.md` 参照
 - [ ] **[Green]** `calculate(state)` を実装し、全テストを通す
   - 各ステージの `daysInStage = endDay - startDay + 1` を計算する
   - 各ステージの `subtotalPowderKg = (dailyAmount * daysInStage) / 1000` を計算する
@@ -99,7 +100,7 @@
   - `stageBreakdown` 配列（`stageNo`, `startDay`, `endDay`, `daysInStage`, `dailyAmount`, `subtotalPowderKg` を含む）を組み立てる
 - [ ] **[Refactor]** コードを整理する。`npm test` が Green のままであることを確認する
 
-**完了条件**: `npm test` で `calculator.test.js` の全テスト（通常テスト + PBT）が Green になること。カバレッジ 100%。
+**完了条件**: `npm test` で `calculator.test.js` の全テスト（具体値テスト + PBT）が Green になること。カバレッジ 100%。
 
 ---
 
@@ -110,19 +111,21 @@
 **手順（TDD: Red → Green → Refactor）**
 
 - [ ] **[Red]** `tests/state.test.js` を作成し、以下のテストを書く
-  - 通常テスト: `getState()` がデフォルト値を返すこと
-  - 通常テスト: `addStage()` でステージが1件増えること
-  - 通常テスト: `removeStage(id)` でステージが1件減ること
-  - 通常テスト: `stages.length === 1` のとき `removeStage()` が何もしないこと
-  - 通常テスト: `updateStage(id, 'dailyAmount', 700)` で値が更新されること
-  - **PBT**: `addStage()` を n 回呼ぶと `stages.length` が n 増えること
-  - **PBT**: `removeStage()` はステージが1件以上あるときのみ件数を減らすこと
+  - 具体値テスト: `getState()` がデフォルト値を返すこと
+  - 具体値テスト: `addStage()` でステージが1件増えること
+  - 具体値テスト: `removeStage(id)` でステージが1件減ること
+  - 具体値テスト: `stages.length === 1` のとき `removeStage()` が何もしないこと
+  - 具体値テスト: `updateStage(id, 'dailyAmount', 700)` で値が更新されること
+  - PBT: PROP-08（`addStage()` を n 回呼ぶと `stages.length` が n 増える）— `correctness.md` 参照
+  - PBT: PROP-07（`removeStage()` 後も `stages.length >= 1`）— `correctness.md` 参照
 - [ ] **[Green]** `state.js` を実装し、全テストを通す（Task 2 の実装と同時進行でよい）
 - [ ] **[Refactor]** `npm test` が Green のままであることを確認する
 
 **完了条件**: `npm test` で `state.test.js` の全テストが Green になること。カバレッジ 80% 以上。
 
 ---
+
+### Task 5: HTMLマークアップ（`index.html`）の実装
 
 **目的**: アプリの構造を定義し、JavaScriptから参照できる id/class を配置する。対応要件: REQ-401〜403, REQ-501〜503, REQ-605
 

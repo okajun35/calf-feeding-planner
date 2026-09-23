@@ -272,7 +272,91 @@ update()
 
 ---
 
-## 8. 要件トレーサビリティ
+## 8. Correctness — Property 設計
+
+`correctness.md` に定義した8つの Property の実装方針を示す。
+各 Property は `fast-check` の Arbitrary で任意の有効入力を生成し、Vitest の `it()` 内で `fc.assert()` を呼び出す。
+
+### calculator.js の Property（PROP-01〜03）
+
+```js
+// tests/calculator.test.js
+import fc from 'fast-check';
+import { calculate } from '../src/calculator.js';
+
+// PROP-01: totalPowderKg > 0
+fc.assert(fc.property(validSingleStageArb, (state) => {
+  return calculate(state).totalPowderKg > 0;
+}));
+
+// PROP-02: costPerHead === totalPowderKg × unitPrice
+fc.assert(fc.property(validSingleStageArb, (state) => {
+  const result = calculate(state);
+  return Math.abs(result.costPerHead - result.totalPowderKg * state.unitPrice) < 1e-9;
+}));
+
+// PROP-03: Σ subtotalPowderKg === totalPowderKg
+fc.assert(fc.property(validMultiStageArb, (state) => {
+  const result = calculate(state);
+  const sum = result.stageBreakdown.reduce((acc, s) => acc + s.subtotalPowderKg, 0);
+  return Math.abs(sum - result.totalPowderKg) < 1e-9;
+}));
+```
+
+### validation.js の Property（PROP-04〜06）
+
+```js
+// tests/validation.test.js
+import fc from 'fast-check';
+import { validate } from '../src/validation.js';
+
+// PROP-04: 有効な入力 → valid: true
+fc.assert(fc.property(validMultiStageArb, (state) => {
+  return validate(state).valid === true;
+}));
+
+// PROP-05: nursingDays 範囲外 → valid: false
+fc.assert(fc.property(invalidNursingDaysArb, (nursingDays) => {
+  const state = { nursingDays, concentration: 12.5, unitPrice: 600,
+    stages: [{ id: 1, startDay: 1, endDay: 60, dailyAmount: 500 }], nextStageId: 2 };
+  return validate(state).valid === false;
+}));
+
+// PROP-06: 連続カバレッジ → errors.coverage === null
+fc.assert(fc.property(validMultiStageArb, (state) => {
+  return validate(state).errors.coverage === null;
+}));
+```
+
+### state.js の Property（PROP-07〜08）
+
+```js
+// tests/state.test.js
+import fc from 'fast-check';
+
+// PROP-07: removeStage 後も stages.length >= 1
+fc.assert(fc.property(
+  fc.integer({ min: 0, max: 20 }),  // 呼び出し回数
+  (callCount) => {
+    // state をリセットして callCount 回 removeStage を呼ぶ
+    return getState().stages.length >= 1;
+  }
+));
+
+// PROP-08: addStage は stages.length を +1 する
+fc.assert(fc.property(
+  fc.integer({ min: 1, max: 10 }),  // 呼び出し回数 n
+  (n) => {
+    const before = getState().stages.length;
+    for (let i = 0; i < n; i++) addStage();
+    return getState().stages.length === before + n;
+  }
+));
+```
+
+---
+
+## 9. 要件トレーサビリティ
 
 | 要件ID | 対応モジュール / 設計要素 |
 |--------|--------------------------|
